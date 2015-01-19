@@ -11,6 +11,9 @@
 #include <netinet/ip.h>
 #include <string.h>
 
+void imrpimirAmenaza(char* targetip, char* Mac1, char* Mac2, bpf_u_int32 timestamp );
+
+
 void callback(u_char *useless,const struct pcap_pkthdr* pkthdr,const u_char* packet){
   static int count = 1;
 
@@ -54,7 +57,10 @@ int main(int argc,char **argv)
 
 
 
+void imrpimirAmenaza(char* targetip, char* Mac1, char* Mac2, bpf_u_int32 timestamp ){
+	printf("DETECT: who-has %s, R1: %s, R2: %s, TS: %d", targetip, Mac1, Mac2, timestamp);
 
+}
 
 
 
