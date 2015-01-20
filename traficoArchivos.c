@@ -27,14 +27,15 @@ typedef struct infoARP{
     char* sourceIP;	
     char* targetMac;
     char* sourceMac;
-    long int timestamp;
+    long int seconds;
+    long int microseconds;
     ARPtype type;
 }infoARP;
 
 
 typedef struct nodelist{
     infoARP* cont;
-    infoARP* next;
+    struct nodelist * next;
 }nodelist;
 
 typedef struct list{
