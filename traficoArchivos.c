@@ -15,9 +15,31 @@
 #include <net/if_arp.h>
 #include <string.h>
 
-void imrpimirAmenaza(char* targetip, char* Mac1, char* Mac2, bpf_u_int32 timestamp );
+void imrpimirAmenaza(char* targetip, char* sourceMac, char* targetMac,long int seconds, long int microseconds );
 void my_callback(u_char *useless,const struct pcap_pkthdr* pkthdr,const u_char* packet);
 
+
+typedef enum{ REQUEST, REPLY} ARPtype; 
+
+//Estructura usada para guardar informacion relevante del ARP
+typedef struct infoARP{
+    char* targetIP;
+    char* sourceIP;	
+    char* targetMac;
+    char* sourceMac;
+    long int timestamp;
+    ARPtype type;
+}infoARP;
+
+
+typedef struct nodelist{
+    infoARP* cont;
+    infoARP* next;
+}nodelist;
+
+typedef struct list{
+   nodelist* header, *last;
+}list;
 
 int main(int argc,char **argv)
 {
@@ -37,14 +59,14 @@ int main(int argc,char **argv)
 
     if(descr == NULL)
     {
-        printf("pcap_open_live() failed due to [%s]\n", errbuf);
+        printf("DEBUG: %s\n", errbuf);
         return -1;
     }
 
     int num_packets=200;
 
     if(pcap_loop(descr,num_packets, my_callback, NULL)==-1){
-    	printf("%s\n",pcap_geterr(descr));
+    	printf("DEBUG: %s\n",pcap_geterr(descr));
 		return;
     }
 
@@ -63,6 +85,9 @@ void my_callback(u_char *useless,const struct pcap_pkthdr* pkthdr,const u_char* 
 	int size_ethernet=sizeof(struct ether_header);//tamaño de la cabezera ethernet
 	h_ethernet = (struct ether_header *) packet;//Apuntamos a la cabezera Ethernet que esta al comienzo de packet
 	printf("\nPacket Number: %d\n",count);
+	time_t seconds = (pkthdr->ts).tv_sec;
+	suseconds_t microseconds = (pkthdr->ts).tv_usec;	
+printf("\n Recibido a las %ld.%ld segundos\n", seconds, microseconds );
 	printf("MAC source: %s\n", ether_ntoa((struct ether_addr *)h_ethernet->ether_shost));
 	printf("MAC destination: %s\n", ether_ntoa((struct ether_addr *)h_ethernet->ether_dhost) );
 
@@ -102,8 +127,8 @@ void my_callback(u_char *useless,const struct pcap_pkthdr* pkthdr,const u_char* 
 
 
 
-void imrpimirAmenaza(char* targetip, char* Mac1, char* Mac2, bpf_u_int32 timestamp ){
-	printf("DETECT: who-has %s, R1: %s, R2: %s, TS: %d", targetip, Mac1, Mac2, timestamp);
+void imrpimirAmenaza(char* targetip, char* sourceMac, char* targetMac,long int seconds, long int microseconds ){
+	printf("DETECT: who-has %s, R1: %s, R2: %s, TS: %ld.%ld", targetip, sourceMac, targetMac, seconds, microseconds);
 
 }
 
