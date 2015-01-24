@@ -16,7 +16,21 @@
 #define MAXBYTES2CAPTURE 2048
 #define TAM 18
 
+
+/***********************************
+Archivo: arpdespoof.c
+Fecha: 24/01/15
+Autores: Oswaldo Bayona, Rodrigo Castro, Jorge Vergara
+Compilacion: gcc arpdespoof.c -o arpdespoof -lpcap
+Proyecto que lee trafico de red desde un archivo o interfaz y detecta ataques ARP
+
+***********************************/
+
+
 typedef enum{ REQUEST=1, REPLY} ARPtype; 
+
+
+
 
 //Estructura usada para guardar informacion relevante del ARP
 typedef struct infoARP{
@@ -31,7 +45,7 @@ typedef struct infoARP{
 typedef struct Tuple {
 	infoARP *request;
 	infoARP	*reply;
-}Tuple;//Representa un par ordena: (request,reply)
+}Tuple;//Representa un par ordenado: (request,reply)
 
 ////////////Lista de nodos enlazados ////////////////////
 typedef struct nodelist{
@@ -51,10 +65,11 @@ int listIsEmpty(list *L);
 void listAdd(list*lista,nodelist*node);
 /////////////////////////////////////////
 
-infoARP*infoARPNew(char*targetIP,char*sourceIP,char*targetMac,char*sourceMac,double timestamp,ARPtype type);
+infoARP* infoARPNew(char*targetIP,char*sourceIP,char*targetMac,char*sourceMac,double timestamp,ARPtype type);
 Tuple *tupleNew(infoARP*request);
 void imprimirAmenaza(char* targetip, char* sourceMac, char* targetMac,double seconds);
 void my_callback(u_char *useless,const struct pcap_pkthdr* pkthdr,const u_char* packet);
+void listarInterfaces();
 void capturarPaquetesDesdeRed(char*device,char*protocol);
 void capturarPaquetesDesdeArchivo(char*filename,char*protocol);
 void detectarAtaque(infoARP*newReply);
@@ -71,28 +86,59 @@ int main(int argc,char **argv)
     bpf_u_int32 pMask;            
     bpf_u_int32 pNet;             
     pcap_if_t *alldevs, *d;
-
-	listaARP=listNew();    
-	timeConfig=5.0;
+    char comando[2];
+    int flaq = 1;
+    filename = (char*)malloc(sizeof(char)*20);
+    dev = (char*)malloc(sizeof(char)*20);
+	
+    listaARP=listNew();    
+    timeConfig=5.0;
     
     int opcion;//1 para hacer sniffing desde la red y 2 para hacerlo desde un archivo
-    opcion=2;
+    printf("\n******Arpdespoof******\n");  
+    
+    do{
+	printf("Ingrese un comando: -i, -r, -t, -c: continuar :\n");
+	scanf("%s",comando );
+	
+	if(!strcmp(comando, "-i")){
+	     printf("\nInterfaces de Red:\n");
+             listarInterfaces();  
+             printf("\nIngrese una interfaz: ");
+             scanf("%s",dev);
+             opcion = 1;	
+	}
+	else if(!strcmp(comando, "-r")){
+	    printf("\nIngrese el nombre del archivo: ");
+	    opcion = 2;
+    	    scanf("%s", filename);
+	}
+	else if(!strcmp(comando, "-t")){
+	    printf("\nIngrese el tiempo en segundos: ");
+	    scanf("%lf",&timeConfig);
+	}
+	else if(!strcmp(comando, "-c")){		
+		flaq= 0;
+	}
+	else{
+	   printf("\nDEBUG: Comando invalido\n");
+	}
+  
+    }while(flaq);
+  
 
     if(opcion==1){
-		dev="wlan0";
-		protocol="arp";
+        protocol="arp";
     	capturarPaquetesDesdeRed(dev,protocol);
     }else{
-    	filename="trace1.pcap";
     	capturarPaquetesDesdeArchivo(filename,"arp");
     }
     return 0;
 }
 
+
+
 void my_callback(u_char *useless,const struct pcap_pkthdr* pkthdr,const u_char* packet){ 
-	static int count = 0; //inicializamos el contador
-	count ++;
-	printf("\nPacket Number: %d\n",count);
 
 	struct ether_header *h_ethernet;
 	struct ether_arp *h_arp;
@@ -103,11 +149,8 @@ void my_callback(u_char *useless,const struct pcap_pkthdr* pkthdr,const u_char* 
 	//tiempo de llegada del mensaje
 	time_t seconds = (pkthdr->ts).tv_sec;
 	suseconds_t microseconds = (pkthdr->ts).tv_usec;	
-	printf("DEBUG: Recibido a las %ld.%ld segundos\n", seconds, microseconds );
 	double tiempo=seconds + (microseconds/1000000.0) ;
 	
-	printf("DEBUG: MAC source: %s\n", ether_ntoa((struct ether_addr *)h_ethernet->ether_shost));
-	printf("DEBUG: MAC destination: %s\n", ether_ntoa((struct ether_addr *)h_ethernet->ether_dhost) );
 
 	h_arp=(struct ether_arp*)(packet+size_ethernet);
 	/*
@@ -140,16 +183,11 @@ void my_callback(u_char *useless,const struct pcap_pkthdr* pkthdr,const u_char* 
 	//struct in_addr contenido_dir=*direccion_ip;
 	//inet_ntoa(contenido_dir);
 	*/
-	printf("DEBUG: ARP Sender MAC adress %s\n",senderMac);
-	printf("DEBUG: ARP Sender IP adress %s\n",senderIp);
-	printf("DEBUG: ARP Target MAC adress %s\n",targetMac);
-	printf("Debug: ARP Target IP adress %s\n",targetIp);
+	
 	if(type==REQUEST){
-		printf("DEBUG: ARP Request \n");
 		infoARP *newRequest=infoARPNew(senderMac,senderIp,targetMac,targetIp,tiempo,REQUEST);
 		listAdd(listaARP,nodelistNew(tupleNew(newRequest)));//inserta request en la tupla, se inserta la tupla en la lista
 	}else{
-		printf("DEBUG: ARP Reply \n");
 		infoARP *newReply=infoARPNew(senderMac,senderIp,targetMac,targetIp,tiempo,REPLY);
 		detectarAtaque(newReply);
 	}
@@ -165,7 +203,7 @@ void detectarAtaque(infoARP*newReply){
 		currentRequest=currentTuple->request;
 		if(esRespuesta(currentRequest,newReply)){
 			t=newReply->timestamp-currentRequest->timestamp;
-			if(t<timeConfig){
+			if(t<=timeConfig){
 				if(currentTuple->reply==NULL){
 					currentTuple->reply=newReply;
 					break;
@@ -217,6 +255,24 @@ Tuple *tupleNew(infoARP*request){
 	t->request=request;
 	t->reply=NULL;
 	return t;
+}
+
+
+
+void listarInterfaces(){
+	
+   char errbuf[PCAP_ERRBUF_SIZE]; // buﬀer para mensajes de error
+   pcap_if_t*current_device;
+
+    if(pcap_findalldevs(&current_device,errbuf)==-1){
+		printf("DEBUG: %s",errbuf);
+	}
+
+	while(current_device->next!=NULL){
+		printf("Nombre del dispositivo: %s\n",current_device->name); //mostramos el nombre del dispositivo
+		current_device=current_device->next;
+	}
+
 }
 
 
