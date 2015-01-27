@@ -31,7 +31,6 @@ typedef enum{ REQUEST=1, REPLY} ARPtype;
 
 
 
-
 //Estructura usada para guardar informacion relevante del ARP
 typedef struct infoARP{
     char* targetIP;
@@ -74,6 +73,7 @@ void capturarPaquetesDesdeRed(char*device,char*protocol);
 void capturarPaquetesDesdeArchivo(char*filename,char*protocol);
 void detectarAtaque(infoARP*newReply);
 int esRespuesta(infoARP*request,infoARP*reply);
+int compararReply(infoARP*reply_uno,infoARP*reply_dos);
 
 
 list* listaARP;//inicializamos la lista
@@ -183,13 +183,19 @@ void my_callback(u_char *useless,const struct pcap_pkthdr* pkthdr,const u_char* 
 	//struct in_addr contenido_dir=*direccion_ip;
 	//inet_ntoa(contenido_dir);
 	*/
-	
+	//printf("DEBUG: ARP Sender MAC adress %s\n",senderMac);
+	//printf("DEBUG: ARP Sender IP adress %s\n",senderIp);
+	//printf("DEBUG: ARP Target MAC adress %s\n",targetMac);
+	//printf("Debug: ARP Target IP adress %s\n",targetIp);
+
 	if(type==REQUEST){
 		infoARP *newRequest=infoARPNew(senderMac,senderIp,targetMac,targetIp,tiempo,REQUEST);
 		listAdd(listaARP,nodelistNew(tupleNew(newRequest)));//inserta request en la tupla, se inserta la tupla en la lista
 	}else{
-		infoARP *newReply=infoARPNew(senderMac,senderIp,targetMac,targetIp,tiempo,REPLY);
-		detectarAtaque(newReply);
+		if(!listIsEmpty(listaARP)){
+			infoARP *newReply=infoARPNew(senderMac,senderIp,targetMac,targetIp,tiempo,REPLY);
+			detectarAtaque(newReply);
+		}
 	}
 }
 
@@ -208,7 +214,9 @@ void detectarAtaque(infoARP*newReply){
 					currentTuple->reply=newReply;
 					break;
 				}else{
-					imprimirAmenaza(currentRequest->targetIP,currentTuple->reply->sourceMac,newReply->sourceMac,newReply->timestamp);
+					if(!compararReply(currentTuple->reply,newReply)){
+						imprimirAmenaza(currentRequest->targetIP,currentTuple->reply->sourceMac,newReply->sourceMac,newReply->timestamp);
+					}
 				}
 			}
 		}
@@ -217,11 +225,24 @@ void detectarAtaque(infoARP*newReply){
 
 int esRespuesta(infoARP*request,infoARP*reply){
 	if( (strcmp(request->sourceMac,reply->targetMac)==0) &&
-		(strcmp(request->sourceIP,reply->targetIP)==0) ){
+		(strcmp(request->sourceIP,reply->targetIP)==0) &&
+		(strcmp(request->targetIP,reply->sourceIP)==0)
+		){
 		return 1;
 	}
 	return 0;
 }
+
+int compararReply(infoARP*reply_uno,infoARP*reply_dos){
+	if( (strcmp(reply_uno->sourceMac,reply_dos->sourceMac)==0) &&
+		(strcmp(reply_uno->sourceIP,reply_dos->sourceIP)==0) &&
+		(strcmp(reply_uno->targetMac,reply_dos->targetMac)==0) &&
+		(strcmp(reply_uno->targetIP,reply_dos->targetIP))==0){
+		return 1;
+	}
+	return 0;	
+}
+
 
 
 
