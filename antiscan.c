@@ -182,6 +182,7 @@ int enviarReply(pcap_t * pcap, u_int8_t senderMac,u_int8_t senderIP,u_int8_t miM
      reply.arp_pro = htons(ETH_P_IP);
      reply.arp_hln = ETHER_ADDR_LEN;
      reply.arp_pln = sizeof(in_addr_t);
+     reply.ea_hdr.ar_op = 2;
      memset(&reply.arp_tha,0,sizeof(reply.arp_tha) );
      memset(reply.arp_tpa,destinationIP ,sizeof(reply.arp_tpa));
      memset(reply.arp_spa,senderIP ,sizeof(reply.arp_spa));
