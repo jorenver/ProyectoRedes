@@ -22,6 +22,7 @@ typedef enum{ REQUEST=1, REPLY} ARPtype;
 
 
 void listarInterfaces();
+int enviarReply(pcap_t * pcap, u_int8_t senderMac,u_int8_t senderIP,u_int8_t miMac,u_int8_t destinationIP);
 
 //variable global
 char* targetIP = "127.0.0.1";   //IP del dispositivo target, localhost por defecto
@@ -168,3 +169,35 @@ void listarInterfaces(){
 }
 
 
+
+int enviarReply(pcap_t * pcap, u_int8_t senderMac,u_int8_t senderIP,u_int8_t miMac,u_int8_t destinationIP){
+     //construccion de la cabezera ethernet
+     struct ether_header ether_h;
+     ether_h.ether_type = htons(ETHERTYPE_ARP);
+     memset(ether_h.ether_dhost,senderMac,sizeof(ether_h.ether_dhost));
+     memset(ether_h.ether_shost,miMac, sizeof(ether_h.ether_shost));
+     //construccion del arp reply
+     struct ether_arp reply;
+     reply.arp_hrd = htons(ARPHRD_ETHER);
+     reply.arp_pro = htons(ETH_P_IP);
+     reply.arp_hln = ETHER_ADDR_LEN;
+     reply.arp_pln = sizeof(in_addr_t);
+     memset(&reply.arp_tha,0,sizeof(reply.arp_tha) );
+     memset(reply.arp_tpa,destinationIP ,sizeof(reply.arp_tpa));
+     memset(reply.arp_spa,senderIP ,sizeof(reply.arp_spa));
+     memset(reply.arp_sha,miMac ,sizeof(reply.arp_sha));
+     memset(reply.arp_tha, senderMac ,sizeof(reply.arp_tha));
+     
+     unsigned char frame[sizeof(struct ether_header) + sizeof(struct ether_arp)];
+     memcpy(frame, &ether_h, sizeof(struct ether_header) );
+     memcpy(frame + sizeof(struct ether_header), &reply,sizeof(struct ether_arp) ); 
+          
+     if(pcap_inject(pcap, frame, sizeof(frame)) == -1){
+        return 0;
+
+     }
+
+     return 1;
+    
+
+}
