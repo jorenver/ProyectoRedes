@@ -24,6 +24,8 @@ typedef enum{ REQUEST=1, REPLY} ARPtype;
 
 void listarInterfaces();
 int enviarReply(pcap_t * pcap, u_int8_t *miMac,u_int8_t *senderIP, u_int8_t *destinationMac,u_int8_t *destinationIP);
+int enviarICMPReply(pcap_t* pcap, u_int8_t* miMac, u_int8_t* senderIP, u_int8_t* destinationMac, u_int8_t* destinationIP);
+unsigned short inChecksum(unsigned short * addr, int len);
 
 //variable global
 char* targetIP = "10.0.2.6";   //IP del dispositivo target, localhost por defecto
@@ -54,7 +56,7 @@ void callback(u_char *useless,const struct pcap_pkthdr* pkthdr,const u_char* pac
     //printf("%d\n\n", type);
 
     //si el arp va dirigido a target y es request envia el arp reply
-    if (type == REQUEST){
+    if (type == REQUEST && strcmp(destinationIP,targetIP)==0){
        printf("*******ARP******");    
        u_int8_t *miMac;
        miMac=(u_int8_t*)malloc(sizeof(u_int8_t)*ETH_ALEN);
@@ -69,16 +71,15 @@ void callback(u_char *useless,const struct pcap_pkthdr* pkthdr,const u_char* pac
        int size_ip=iph->ihl*4;
        struct icmphdr *icmph=(struct icmphdr*)(packet+size_ip+size_eth);
 
-       switch(icmph->type){
-            case ICMP_ECHO:
-	       printf("ICMP_ECHO\n");
-	       break;
-           case ICMP_ECHOREPLY:
-	       printf("ICMP_ECHOREPLY\n");
-	       break;
-           default:
-	       printf("ICMP tipo %d\n",icmph->type);
-	       break;
+       if (icmph->type == ICMP_ECHO ){ // si se recibe un ICMP ECHO
+          
+          printf("*********Enviar ICMP*******\n");
+          u_int8_t *miMac;
+          miMac=(u_int8_t*)malloc(sizeof(u_int8_t)*ETH_ALEN);
+          struct ether_addr* Mac = (struct ether_addr*)ether_aton("08:00:27:ca:eb:7e");
+          miMac = Mac->ether_addr_octet; 
+          //enviarICMPReply(descr, miMac,&iph->daddr,&h_ethernet->ether_shost, iph->saddr );  
+          
        }
        printf("\nPacket number [%d], length of this packet is: %d\n", count++, pkthdr->len);
   }
@@ -214,8 +215,59 @@ int enviarICMPReply(pcap_t* pcap, u_int8_t* miMac, u_int8_t* senderIP, u_int8_t*
   ether_h->ether_type = htons(ETHERTYPE_IP);
   memcpy(ether_h->ether_shost,miMac,sizeof(ether_h->ether_shost));//source maac
   memcpy(ether_h->ether_dhost,destinationMac,sizeof(ether_h->ether_dhost));//destination mac
+  char * packet;
+  //creacion del paquete IP/ICMP   
+  struct iphdr* ip_header; 
+  struct icmphdr * icmp_header;
+  packet = (char*)malloc(sizeof(struct ether_header) + sizeof(struct iphdr) + 
+                         sizeof(struct icmphdr)); 
 
-  //creacion del paquete IP/ICMP    
-   
+  ip_header = (struct iphdr*)packet[sizeof(struct ether_header)];
+  icmp_header = (struct icmphdr*)packet[sizeof(struct ether_header) + sizeof(struct iphdr)];
+  ip_header->ihl = 5;
+  ip_header->version = 4;
+  ip_header->tot_len = sizeof(struct iphdr) + sizeof(struct icmphdr);
+  ip_header->protocol = IPPROTO_ICMP;
+  ip_header->saddr = *senderIP;
+  ip_header->daddr = *destinationIP;
+  ip_header->check = inChecksum((unsigned short*)ip_header, sizeof(struct iphdr));
+  
+  icmp_header->type = ICMP_ECHOREPLY;
+  icmp_header->checksum = inChecksum((unsigned short*)icmp_header,sizeof(struct icmphdr));	
+  
+
+  if(pcap_inject(pcap, packet, sizeof(packet)) == -1){
+    return 0;
+  }
+  return 1;  
+
+}
+
+
+//fuente: http://stackoverflow.com/questions/13620607/creating-ip-network-packets
+
+unsigned short inChecksum(unsigned short * addr, int len){
+   register int sum =0;
+   u_short answer = 0;
+   register u_short *w = addr;
+   register int nleft = len;
+
+    while (nleft > 1)
+    {
+      sum += *w++;
+      nleft -= 2;
+    }
+    
+
+    if (nleft == 1)
+    {
+      *(u_char *) (&answer) = *(u_char *) w;
+      sum += answer;
+    }
+
+    sum = (sum >> 16) + (sum & 0xffff);     
+    sum += (sum >> 16);         
+    answer = ~sum;             
+    return (answer); 
 
 }
