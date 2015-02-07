@@ -28,6 +28,7 @@ int enviarReply(pcap_t * pcap, u_int8_t *miMac,u_int8_t *senderIP, u_int8_t *des
 //variable global
 char* targetIP = "10.0.2.6";   //IP del dispositivo target, localhost por defecto
 char * mimac = "08:00:27:ca:eb:7e"; //Mac del target
+pcap_t* descr; 
 
 void callback(u_char *useless,const struct pcap_pkthdr* pkthdr,const u_char* packet){
   static int count = 1;
@@ -49,22 +50,20 @@ void callback(u_char *useless,const struct pcap_pkthdr* pkthdr,const u_char* pac
     //strcpy(senderIp,inet_ntoa(*((struct in_addr*)h_arp->arp_spa) ));//produce error???
     type=ntohs(h_arp->ea_hdr.ar_op);
 
-    printf("destination: %s, targetIP %s\n",destinationIP, targetIP);
-    printf("%d\n\n", type);
+    //printf("destination: %s, targetIP %s\n",destinationIP, targetIP);
+    //printf("%d\n\n", type);
 
     //si el arp va dirigido a target y es request envia el arp reply
-    if (strcmp(targetIP,destinationIP)==0 && type == REQUEST){
-       printf("*******ARP******");
-       pcap_t* descr;       
+    if (type == REQUEST){
+       printf("*******ARP******");    
        u_int8_t *miMac;
        miMac=(u_int8_t*)malloc(sizeof(u_int8_t)*ETH_ALEN);
        struct ether_addr* Mac = (struct ether_addr*)ether_aton("08:00:27:ca:eb:7e");
        miMac = Mac->ether_addr_octet; 
-       enviarReply(descr,miMac, h_arp->arp_tpa, h_arp->arp_sha, h_arp->arp_spa);
+       enviarReply(descr,miMac, h_arp->arp_tpa, h_arp->arp_sha, h_arp->arp_spa);;
     }
 
-  }
-  else{ //si no se arp es un paquete IP
+  }else{ //si no se arp es un paquete IP
     
        struct iphdr *iph=(struct iphdr*)(packet+size_eth);
        int size_ip=iph->ihl*4;
@@ -91,7 +90,6 @@ int main(int argc,char **argv)
     char *dev;
     int max=10;
     char errbuf[PCAP_ERRBUF_SIZE];
-    pcap_t* descr;
     struct bpf_program fp;        /* to hold compiled program */
     bpf_u_int32 pMask;            /* subnet mask */
     bpf_u_int32 pNet;             /* ip address*/
@@ -174,9 +172,6 @@ void listarInterfaces(){
 	}
 
 }
-
-
-
 
 int enviarReply(pcap_t * pcap, u_int8_t *miMac,u_int8_t *senderIP, u_int8_t *destinationMac,u_int8_t *destinationIP){
   printf("enviarReply\n");
