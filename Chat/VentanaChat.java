@@ -2,7 +2,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 
-public class VentanaChat extends JFrame{
+public class VentanaChat extends JFrame implements Observer{
 	
 	private Container c;
 	private JTextArea txtChat;
@@ -27,7 +27,8 @@ public class VentanaChat extends JFrame{
 		c.add(btnEnviar);
 		btnEnviar.addActionListener(ListenerBoton);
 		//pack();
-		cliente =new Cliente();
+		cliente =new Cliente(nombre);
+		cliente.setObserver(this);
 		cliente.iniciarConeccion();
 		this.setVisible(true);
 	}
@@ -36,11 +37,15 @@ public class VentanaChat extends JFrame{
 		public void actionPerformed(ActionEvent e){
 			cliente.enivarMensaje(txtMensaje.getText()+"\n");
 			txtMensaje.setText("");
-			System.out.println ("El mensaje fue enviado");
+			System.out.println ("envio un Mensaje");
 		}
 	
 	};
 
+	@Override   
+	public void update(String s) {
+		txtChat.setText(txtChat.getText()+s+"\n");
+	}
 
 
 	public static void main(String args[]){

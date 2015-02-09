@@ -78,7 +78,7 @@ public class Servidor extends JFrame implements Observer{
 	@Override   
 	public void update(String s) {
 		for(ManejadorCliente c : clientes){
-			c.enviarMensaje(s);
+			c.enviarMensaje(s+"\n");
 		}
 	}
 	

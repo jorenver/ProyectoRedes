@@ -43,7 +43,7 @@ public class ManejadorCliente extends Thread {
 
     public void enviarMensaje(String s){
         try{
-            System.out.println ("se envio mensaje al cliente");
+            System.out.println ("se envio mensaje a: "+nom);
             salida.writeUTF(s);
         }catch(Exception e){};
     }

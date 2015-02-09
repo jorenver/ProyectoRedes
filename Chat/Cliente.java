@@ -7,6 +7,12 @@ public class Cliente {
 	private String ip ="127.0.0.1";
 	private DataOutputStream salida;
 	private DataInputStream entrada;
+	private Observer observer;
+	private String nombre;
+
+	public Cliente(String nombre){
+		this.nombre=nombre;
+	}
 
 
 	public void iniciarConeccion(){
@@ -32,7 +38,7 @@ public class Cliente {
 
 	public void enivarMensaje(String s){
 		try{
-			salida.writeUTF(s);
+			salida.writeUTF(nombre+" Dice: "+s);
 			System.out.println ("envio mensaje al manejador");
 		}catch(Exception e){};
 	}
@@ -44,6 +50,10 @@ public class Cliente {
 		return null;	
 	}
 
+	public void setObserver(Observer observer){
+		this.observer=observer;
+	}
+
 	Thread recibirMensajes =new Thread(){
 		//acepta la coneccion de todos los clientes
 		@Override
@@ -52,8 +62,10 @@ public class Cliente {
 	        while(true){
 	            
 	            	s=leerMensaje();
-	            	if(s!=null)
+	            	if(s!=null){
 	            		System.out.println (s);
+	            		observer.update(s);
+	            	}
 	            
 	        }
 	    }
